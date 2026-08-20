@@ -204,74 +204,70 @@ class ProcessingScreen extends StatefulWidget {
 class _ProcessingScreenState extends State<ProcessingScreen> {
   InAppWebViewController? _webViewController;
   int _currentIndex = 0;
-  String _status = 'Preparing secure session...';
+  String _status = 'Starting high-speed processing...';
   String? _error;
-  bool _isLoading = true;
-  Future<void>? _pageLoaded;
-  VoidCallback? _completePageLoad;
+  double _progress = 0.0;
+  bool _isReady = false;
+
+  late List<Map<String, dynamic>?> _accountPayloads;
 
   @override
   void initState() {
     super.initState();
+    _accountPayloads = List.filled(widget.links.length, null);
   }
 
-  Future<void> _processNext() async {
-    if (!mounted || _currentIndex >= widget.links.length) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _status = 'All sessions are connected';
-        });
+  void _startBulkProcessing() async {
+    for (int i = 0; i < widget.links.length; i++) {
+      if (!mounted) return;
+      setState(() {
+        _progress = (i + 1) / widget.links.length;
+        _status = 'Fetching account data ${i + 1} / ${widget.links.length}...';
+      });
+
+      try {
+        final response = await http.get(Uri.parse(widget.links[i])).timeout(const Duration(seconds: 10));
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final payload = jsonDecode(response.body);
+          if (payload is Map<String, dynamic>) {
+            _accountPayloads[i] = payload;
+          }
+        }
+      } catch (e) {
+        // نادیده گرفتن خطا برای ادامه پردازش سایر اکانت‌ها
       }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isReady = true;
+      _progress = 1.0;
+      _status = 'All accounts processed! Ready to view.';
+    });
+
+    _loadAccountToWebView(0);
+  }
+
+  Future<void> _loadAccountToWebView(int index) async {
+    final payload = _accountPayloads[index];
+    
+    setState(() {
+      _currentIndex = index;
+      _error = null;
+    });
+
+    if (payload == null) {
+      setState(() => _error = 'Failed to fetch data for this account.');
       return;
     }
 
-    final link = widget.links[_currentIndex];
-    setState(() {
-      _isLoading = true;
-      _error = null;
-      _status = 'Fetching session ${_currentIndex + 1} of ${widget.links.length}...';
-    });
+    setState(() => _status = 'Connecting to Account ${index + 1}...');
 
-    try {
-      final loadCompleter = Completer<void>();
-      _pageLoaded = loadCompleter.future;
-      _completePageLoad = () => loadCompleter.complete();
-      final response = await http.get(Uri.parse(link));
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('Session endpoint returned ${response.statusCode}.');
-      }
-
-      final payload = jsonDecode(response.body);
-      if (payload is! Map<String, dynamic>) {
-        throw const FormatException('The session response is not a JSON object.');
-      }
-
-      await _injectSession(payload, link);
-      if (!mounted) return;
-      setState(() {
-        _status = 'Connected session ${_currentIndex + 1}';
-        _isLoading = false;
-      });
-      if (_currentIndex < widget.links.length - 1) {
-        setState(() => _currentIndex++);
-        _processNext();
-      }
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
-        _status = 'Session ${_currentIndex + 1} needs attention';
-      });
-    }
-  }
-
-  Future<void> _injectSession(Map<String, dynamic> payload, String sourceLink) async {
-    final target = _readTargetUrl(payload) ?? sourceLink;
+    final target = 'https://www.okala.com/';
     final cookieManager = CookieManager.instance();
-    final cookies = _readCookies(payload['cookies']);
+    await cookieManager.deleteAllCookies();
 
+    final cookies = _readCookies(payload['cookies']);
     for (final cookie in cookies) {
       final name = cookie['name']?.toString();
       final value = cookie['value']?.toString();
@@ -287,11 +283,8 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
       );
     }
 
-    await _webViewController?.loadUrl(
-      urlRequest: URLRequest(url: WebUri(target)),
-    );
-    await _pageLoaded;
-
+    await _webViewController?.removeAllUserScripts();
+    
     final localStorage = _readLocalStorage(payload['local_storage']);
     if (localStorage.isNotEmpty) {
       final script = localStorage.entries
@@ -301,17 +294,20 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
             return "window.localStorage.setItem($key, $value);";
           })
           .join();
-      await _webViewController?.evaluateJavascript(source: script);
-      await _webViewController?.reload();
+          
+      await _webViewController?.addUserScript(
+        userScript: UserScript(
+          source: script,
+          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+        )
+      );
     }
-  }
 
-  String? _readTargetUrl(Map<String, dynamic> payload) {
-    for (final key in ['target_url', 'targetUrl', 'redirect_url', 'url']) {
-      final value = payload[key];
-      if (value is String && value.startsWith('http')) return value;
-    }
-    return null;
+    await _webViewController?.loadUrl(
+      urlRequest: URLRequest(url: WebUri(target)),
+    );
+
+    setState(() => _status = 'Account ${index + 1} Connected ✓');
   }
 
   List<Map<String, dynamic>> _readCookies(dynamic raw) {
@@ -344,12 +340,35 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final progress = (_currentIndex + (_isLoading ? 0 : 1)) / widget.links.length;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Nexus Link', style: TextStyle(fontWeight: FontWeight.w700)),
         backgroundColor: NexusColors.navy.withValues(alpha: 0.92),
         actions: [
+          if (_isReady) ...[
+            IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+              onPressed: _currentIndex > 0 ? () => _loadAccountToWebView(_currentIndex - 1) : null,
+              color: _currentIndex > 0 ? NexusColors.teal : NexusColors.muted,
+              tooltip: 'Previous Account',
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Center(
+                child: Text(
+                  '${_currentIndex + 1}/${widget.links.length}',
+                  style: const TextStyle(color: NexusColors.teal, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.arrow_forward_ios_rounded, size: 20),
+              onPressed: _currentIndex < widget.links.length - 1 ? () => _loadAccountToWebView(_currentIndex + 1) : null,
+              color: _currentIndex < widget.links.length - 1 ? NexusColors.teal : NexusColors.muted,
+              tooltip: 'Next Account',
+            ),
+            const SizedBox(width: 8),
+          ],
           IconButton(
             tooltip: 'Clear all sessions',
             onPressed: _reset,
@@ -365,18 +384,10 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Expanded(child: Text(_status, style: const TextStyle(color: Colors.white))),
-                    Text(
-                      '${_currentIndex + 1}/${widget.links.length}',
-                      style: const TextStyle(color: NexusColors.teal, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
+                Text(_status, style: const TextStyle(color: Colors.white, fontSize: 13)),
                 const SizedBox(height: 10),
                 LinearProgressIndicator(
-                  value: progress.clamp(0.0, 1.0).toDouble(),
+                  value: _progress.clamp(0.0, 1.0).toDouble(),
                   backgroundColor: NexusColors.border,
                   color: NexusColors.green,
                   minHeight: 4,
@@ -384,7 +395,7 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
                 if (_error != null) ...[
                   const SizedBox(height: 10),
                   Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
-                  TextButton(onPressed: _processNext, child: const Text('Try again')),
+                  TextButton(onPressed: () => _loadAccountToWebView(_currentIndex), child: const Text('Try again')),
                 ],
               ],
             ),
@@ -399,11 +410,7 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
               ),
               onWebViewCreated: (controller) {
                 _webViewController = controller;
-                _processNext();
-              },
-              onLoadStop: (controller, url) async {
-                _completePageLoad?.call();
-                _completePageLoad = null;
+                _startBulkProcessing();
               },
             ),
           ),
@@ -530,3 +537,4 @@ class _AmbientGlow extends StatelessWidget {
     );
   }
 }
+
