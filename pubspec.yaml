@@ -1,44 +1,27 @@
 name: nexus_link
-description: Nexus link management app.
-
-# جلوگیری از انتشار تصادفی پکیج
+description: Enterprise bulk session manager for Okala links.
 publish_to: 'none'
-
-# ورژن به 1.0.1 ارتقا یافت
-version: 1.0.1+2
+version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.3.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.2
-  
-  # پکیج‌های استفاده شده در برنامه
-  http: ^1.2.0
   flutter_inappwebview: ^6.0.0
+  http: ^1.2.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
-  
-  # پکیج ساخت آیکون برنامه
+  flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.13.1
-
-# تنظیمات ساخت آیکون (اصلاح شده برای رفع مشکل سایز)
-flutter_launcher_icons:
-  android: true
-  ios: false
-  image_path: "assets/nexus_icon.png"
-  adaptive_icon_background: "#1E212D" # رنگ تم برنامه برای پس‌زمینه آیکون
-  adaptive_icon_foreground: "assets/nexus_icon.png"
-  min_sdk_size: 21
 
 flutter:
   uses-material-design: true
-  
-  # معرفی پوشه و عکس‌ها به فلاتر
-  assets:
-    - assets/nexus_icon.png
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "icon.png"
