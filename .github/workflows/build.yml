@@ -1,76 +1,64 @@
-name: Build Nexus Link APK
+name: Build Nexus Link
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Setup Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
+          cache: true
 
-      - name: Clean and Rebuild Android Platform
-        run: |
-          set -euo pipefail
-
-          echo "1) Remove android directory if present (we'll recreate it)"
-          if [ -d android ]; then
-            rm -rf android
-          fi
-
-          echo "2) Recreate android platform"
-          flutter create --platforms=android --project-name nexus_link --org com.hyperlink.nexus .
-
-          echo "3) Ensure minSdkVersion is at least 24 in all Android build.gradle files"
-          # Update any occurrences like: minSdkVersion 16 / 19 / 21 or minSdkVersion flutter.minSdkVersion
-          find android -type f -name "build.gradle*" -print0 | xargs -0 -r sed -i -E \
-            's/minSdkVersion[[:space:]]+flutter\.minSdkVersion/minSdkVersion 24/g; s/minSdkVersion[[:space:]]+[0-9]+/minSdkVersion 24/g'
-
-          echo "4) Add INTERNET permission to AndroidManifest if missing, and set app label"
-          MANIFEST=android/app/src/main/AndroidManifest.xml
-          if [ -f "$MANIFEST" ]; then
-            if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
-              sed -i '/<application/i \
-    <uses-permission android:name="android.permission.INTERNET"/>' "$MANIFEST"
-            fi
-
-            # Set a readable label (only replaces the attribute value)
-            sed -i 's/android:label="[^"]*"/android:label="Nexus Link"/' "$MANIFEST" || true
-          fi
-
-      - name: Install Dependencies
+      - name: Install dependencies
         run: flutter pub get
 
-      - name: Generate App Icon
-        run: dart run flutter_launcher_icons
-
-      - name: Patch InAppWebView Gradle Compatibility
+      - name: Prepare Android project
+        shell: bash
         run: |
           set -euo pipefail
-          # Look for flutter_inappwebview build.gradle files in the pub cache and replace the legacy proguard file reference
-          PUBCACHE_DIR="${PUB_CACHE:-$HOME/.pub-cache}"
-          find "$PUBCACHE_DIR" -type f -name build.gradle -path "*flutter_inappwebview*" -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} + || true
+          flutter create --platforms=android --project-name nexus_link .
 
-      - name: Build Optimized APK
-        run: flutter build apk --release --split-per-abi
+          GRADLE_FILE=""
+          if [ -f android/app/build.gradle ]; then
+            GRADLE_FILE="android/app/build.gradle"
+          elif [ -f android/app/build.gradle.kts ]; then
+            GRADLE_FILE="android/app/build.gradle.kts"
+          fi
 
-      - name: Upload Artifacts
+          if [ -n "$GRADLE_FILE" ]; then
+            sed -i \
+              -e 's/flutter\.minSdkVersion/21/g' \
+              -e 's/minSdk = flutter\.minSdkVersion/minSdk = 21/g' \
+              "$GRADLE_FILE"
+          else
+            echo "Android app Gradle file not found" >&2
+            exit 1
+          fi
+
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
+            sed -i '/<manifest[^>]*>/a\    <uses-permission android:name="android.permission.INTERNET"/>' "$MANIFEST"
+          fi
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: nexus-link-app-optimized
-          path: build/app/outputs/flutter-apk/*-release.apk
+          name: nexus-link-release
+          path: build/app/outputs/flutter-apk/app-release.apk
