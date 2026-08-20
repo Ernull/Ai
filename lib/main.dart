@@ -229,14 +229,10 @@ class AccountService {
     return AccountData(localStorage: localStorageMap, cookies: cookiesList);
   }
 
-  /// Mutates the JSON string:
-  /// - "stateCode": 0 → "stateCode": 1
-  /// - "customerIsLoggedInForFirstTime": true → false
+  /// Mutates the JSON string
   static String _mutateStateJson(String jsonString) {
     String mutated = jsonString;
 
-    // Handle both cases: where stateCode is a number in JSON
-    // and where it might be inside an escaped JSON string
     mutated = mutated.replaceAll(
       RegExp(r'"stateCode"\s*:\s*0'),
       '"stateCode": 1',
@@ -245,7 +241,6 @@ class AccountService {
       RegExp(r'"stateCode"\s*:\s*"0"'),
       '"stateCode": "1"',
     );
-    // Handle escaped JSON (e.g., inside persist:root where values are stringified)
     mutated = mutated.replaceAll(
       RegExp(r'\\?"stateCode\\?"\s*:\s*0'),
       '"stateCode":1',
@@ -255,7 +250,6 @@ class AccountService {
       '\\"stateCode\\":1',
     );
 
-    // customerIsLoggedInForFirstTime: true → false
     mutated = mutated.replaceAll(
       RegExp(r'"customerIsLoggedInForFirstTime"\s*:\s*true'),
       '"customerIsLoggedInForFirstTime": false',
@@ -365,21 +359,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.asset(
-                'assets/nexus_icon.png',
+              child: Container(
                 width: 32,
                 height: 32,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    gradient: const LinearGradient(
-                      colors: [AppColors.teal, AppColors.neonGreen],
-                    ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  gradient: const LinearGradient(
+                    colors: [AppColors.teal, AppColors.neonGreen],
                   ),
-                  child: const Icon(Icons.link, size: 18, color: Colors.white),
                 ),
+                child: const Icon(Icons.link, size: 18, color: Colors.white),
               ),
             ),
             const SizedBox(width: 12),
@@ -403,7 +392,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Header section
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -422,7 +410,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                       child: Column(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.auto_awesome,
                             color: AppColors.neonGreen,
                             size: 36,
@@ -437,7 +425,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Text(
+                          const Text(
                             'Links will be extracted automatically',
                             style: TextStyle(
                               fontSize: 14,
@@ -448,8 +436,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                     ),
                     const SizedBox(height: 20),
-
-                    // Text input
                     TextField(
                       controller: _textController,
                       maxLines: 10,
@@ -472,8 +458,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                     ),
                     const SizedBox(height: 24),
-
-                    // Process button
                     AnimatedBuilder(
                       animation: _pulseAnimation,
                       builder: (context, child) {
@@ -536,8 +520,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         ),
                       ),
                     ),
-
-                    // Link count indicator
                     if (_hasText) ...[
                       const SizedBox(height: 16),
                       Builder(builder: (_) {
@@ -577,8 +559,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
               ),
             ),
-
-            // Footer
             Container(
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
@@ -595,7 +575,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   Icon(Icons.send_rounded,
                       size: 18, color: AppColors.teal.withOpacity(0.8)),
                   const SizedBox(width: 8),
-                  Text(
+                  const Text(
                     'ساخته شده توسط @OkalaLink',
                     style: TextStyle(
                       fontSize: 14,
@@ -610,49 +590,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ),
       ),
     );
-  }
-}
-
-// ============================================================================
-// ANIMATED BUILDER HELPER (for pulse animation)
-// ============================================================================
-
-class AnimatedBuilder extends StatelessWidget {
-  final Animation<double> animation;
-  final Widget Function(BuildContext, Widget?) builder;
-  final Widget? child;
-
-  const AnimatedBuilder({
-    super.key,
-    required this.animation,
-    required this.builder,
-    this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder2(
-      animation: animation,
-      builder: builder,
-      child: child,
-    );
-  }
-}
-
-class AnimatedBuilder2 extends AnimatedWidget {
-  final Widget Function(BuildContext, Widget?) builder;
-  final Widget? child;
-
-  const AnimatedBuilder2({
-    super.key,
-    required Animation<double> animation,
-    required this.builder,
-    this.child,
-  }) : super(listenable: animation);
-
-  @override
-  Widget build(BuildContext context) {
-    return builder(context, child);
   }
 }
 
@@ -675,9 +612,7 @@ class ProcessingScreen extends StatefulWidget {
   State<ProcessingScreen> createState() => _ProcessingScreenState();
 }
 
-class _ProcessingScreenState extends State<ProcessingScreen>
-    with TickerProviderStateMixin {
-  // State management with ValueNotifier to avoid unnecessary rebuilds
+class _ProcessingScreenState extends State<ProcessingScreen> {
   final ValueNotifier<int> _currentIndex = ValueNotifier<int>(0);
   final ValueNotifier<ProcessingState> _state =
       ValueNotifier<ProcessingState>(ProcessingState.idle);
@@ -688,20 +623,9 @@ class _ProcessingScreenState extends State<ProcessingScreen>
   InAppWebViewController? _webViewController;
   final CookieManager _cookieManager = CookieManager.instance();
 
-  late AnimationController _loadingAnimController;
-  late Animation<double> _loadingAnimation;
-
   @override
   void initState() {
     super.initState();
-    _loadingAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat();
-    _loadingAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      _loadingAnimController,
-    );
-
     // Auto-start first account
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.links.isNotEmpty) {
@@ -716,7 +640,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     _state.dispose();
     _statusMessage.dispose();
     _progress.dispose();
-    _loadingAnimController.dispose();
     super.dispose();
   }
 
@@ -729,7 +652,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     _progress.value = 0.2;
 
     try {
-      // Step 1: Fetch account data
       final accountData =
           await AccountService.fetchAccountData(widget.links[index]);
 
@@ -737,17 +659,14 @@ class _ProcessingScreenState extends State<ProcessingScreen>
       _statusMessage.value = 'Injecting cookies & storage...';
       _progress.value = 0.5;
 
-      // Step 2: Clear existing data
       await _cookieManager.deleteAllCookies();
 
       if (_webViewController != null) {
-        // Clear localStorage
         await _webViewController!.evaluateJavascript(
           source: 'localStorage.clear(); sessionStorage.clear();',
         );
       }
 
-      // Step 3: Inject cookies
       for (final cookie in accountData.cookies) {
         await _cookieManager.setCookie(
           url: WebUri('https://www.okala.com/'),
@@ -762,11 +681,9 @@ class _ProcessingScreenState extends State<ProcessingScreen>
 
       _progress.value = 0.7;
 
-      // Step 4: Inject localStorage via JavaScript
       if (_webViewController != null && accountData.localStorage.isNotEmpty) {
         final StringBuffer jsCode = StringBuffer();
         for (final entry in accountData.localStorage.entries) {
-          // Properly escape for JavaScript
           final escapedKey = _escapeJs(entry.key);
           final escapedValue = _escapeJs(entry.value);
           jsCode.writeln(
@@ -778,7 +695,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
       _progress.value = 0.85;
       _statusMessage.value = 'Loading Okala...';
 
-      // Step 5: Navigate to okala.com (reuse WebView - no rebuild!)
       if (_webViewController != null) {
         await _webViewController!.loadUrl(
           urlRequest: URLRequest(url: WebUri('https://www.okala.com/')),
@@ -856,10 +772,7 @@ class _ProcessingScreenState extends State<ProcessingScreen>
       ),
       body: Column(
         children: [
-          // Status bar
           _buildStatusBar(),
-
-          // WebView - single instance, never destroyed
           Expanded(
             child: ClipRRect(
               child: InAppWebView(
@@ -895,8 +808,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
               ),
             ),
           ),
-
-          // Bottom navigation
           _buildBottomNav(),
         ],
       ),
@@ -920,10 +831,8 @@ class _ProcessingScreenState extends State<ProcessingScreen>
           ),
           child: Row(
             children: [
-              // Animated status indicator
               _buildStateIndicator(state),
               const SizedBox(width: 12),
-              // Status message
               Expanded(
                 child: ValueListenableBuilder<String>(
                   valueListenable: _statusMessage,
@@ -989,4 +898,3 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     );
   }
 }
-
