@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Flutter
@@ -20,18 +20,18 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Prepare Android project
+      - name: Setup Project & Fix Android Settings
         shell: bash
         run: |
           set -euo pipefail
+          
+          # ۱. ساخت پوشه‌ها و فایل‌های اندروید
           flutter create --platforms=android --project-name nexus_link .
 
-          # حذف پوشه تست پیش‌فرض برای جلوگیری از ارور
+          # ۲. حذف پوشه تست پیش‌فرض (برای جلوگیری از ارور)
           rm -rf test
 
+          # ۳. ارتقای SDK اندروید برای پشتیبانی از وب‌ویو
           GRADLE_FILE=""
           if [ -f android/app/build.gradle ]; then
             GRADLE_FILE="android/app/build.gradle"
@@ -49,13 +49,20 @@ jobs:
             exit 1
           fi
 
+          # ۴. تزریق مجوز اینترنت
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
             sed -i '/<manifest[^>]*>/a\    <uses-permission android:name="android.permission.INTERNET"/>' "$MANIFEST"
           fi
           
-          # 🪄 رفع قطعی باگ Proguard با جستجوی مسیر نصب فلاتر در گیت‌هاب 🪄
+          # ۵. رفع باگ Proguard
           find /opt/hostedtoolcache ~/.pub-cache -type f -name "build.gradle" 2>/dev/null -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} + || true
+
+      - name: Install dependencies & Generate Icon
+        run: |
+          # ۶. دانلود پکیج‌ها و تبدیل اتوماتیک عکس icon.png به آیکون برنامه 🪄
+          flutter pub get
+          if [ -f "icon.png" ]; then flutter pub run flutter_launcher_icons; fi
 
       - name: Build release APK
         run: flutter build apk --release
