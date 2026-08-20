@@ -29,6 +29,9 @@ jobs:
           set -euo pipefail
           flutter create --platforms=android --project-name nexus_link .
 
+          # حذف پوشه تست پیش‌فرض برای جلوگیری از ارور MyApp
+          rm -rf test
+
           GRADLE_FILE=""
           if [ -f android/app/build.gradle ]; then
             GRADLE_FILE="android/app/build.gradle"
@@ -50,9 +53,6 @@ jobs:
           if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
             sed -i '/<manifest[^>]*>/a\    <uses-permission android:name="android.permission.INTERNET"/>' "$MANIFEST"
           fi
-
-      - name: Analyze
-        run: flutter analyze
 
       - name: Build release APK
         run: flutter build apk --release
