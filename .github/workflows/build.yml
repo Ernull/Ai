@@ -26,23 +26,32 @@ jobs:
 
       - name: Clean and Rebuild Android Platform
         run: |
-          # ۱. حذف کامل فایل‌های اندرویدی قدیمی برای جلوگیری از تداخل با برنامه قبلی
-          rm -rf android
-          
-          # ۲. ساخت مجدد پلتفرم اندروید با نام و آیدی کاملاً جدید
+          set -euo pipefail
+
+          echo "1) Remove android directory if present (we'll recreate it)"
+          if [ -d android ]; then
+            rm -rf android
+          fi
+
+          echo "2) Recreate android platform"
           flutter create --platforms=android --project-name nexus_link --org com.hyperlink.nexus .
-          
-          # ۳. ارتقای حداقل نسخه اندروید به 24 (پیش‌نیاز ضروری InAppWebView)
-          sed -i 's/flutter.minSdkVersion/24/g' android/app/build.gradle*
-          sed -i 's/minSdkVersion 16/minSdkVersion 24/g' android/app/build.gradle*
-          sed -i 's/minSdkVersion 19/minSdkVersion 24/g' android/app/build.gradle*
-          sed -i 's/minSdkVersion 21/minSdkVersion 24/g' android/app/build.gradle*
-          
-          # ۴. افزودن دسترسی اینترنت به مانیفست اندروید
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
-          
-          # ۵. تغییر نام نمایشی برنامه در گوشی به Nexus Link
-          sed -i 's/android:label="nexus_link"/android:label="Nexus Link"/' android/app/src/main/AndroidManifest.xml
+
+          echo "3) Ensure minSdkVersion is at least 24 in all Android build.gradle files"
+          # Update any occurrences like: minSdkVersion 16 / 19 / 21 or minSdkVersion flutter.minSdkVersion
+          find android -type f -name "build.gradle*" -print0 | xargs -0 -r sed -i -E \
+            's/minSdkVersion[[:space:]]+flutter\.minSdkVersion/minSdkVersion 24/g; s/minSdkVersion[[:space:]]+[0-9]+/minSdkVersion 24/g'
+
+          echo "4) Add INTERNET permission to AndroidManifest if missing, and set app label"
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          if [ -f "$MANIFEST" ]; then
+            if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
+              sed -i '/<application/i \
+    <uses-permission android:name="android.permission.INTERNET"/>' "$MANIFEST"
+            fi
+
+            # Set a readable label (only replaces the attribute value)
+            sed -i 's/android:label="[^"]*"/android:label="Nexus Link"/' "$MANIFEST" || true
+          fi
 
       - name: Install Dependencies
         run: flutter pub get
@@ -52,11 +61,12 @@ jobs:
 
       - name: Patch InAppWebView Gradle Compatibility
         run: |
-          # ۶. اصلاح خطای ناسازگاری پروگارد در کشِ کتابخانه InAppWebView
-          find ~/.pub-cache/hosted/pub.dev/flutter_inappwebview_android-*/android -name build.gradle -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
+          set -euo pipefail
+          # Look for flutter_inappwebview build.gradle files in the pub cache and replace the legacy proguard file reference
+          PUBCACHE_DIR="${PUB_CACHE:-$HOME/.pub-cache}"
+          find "$PUBCACHE_DIR" -type f -name build.gradle -path "*flutter_inappwebview*" -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} + || true
 
       - name: Build Optimized APK
-        # ۷. خروجی گرفتن و تقسیم بر اساس پردازنده برای کاهش حجم
         run: flutter build apk --release --split-per-abi
 
       - name: Upload Artifacts
