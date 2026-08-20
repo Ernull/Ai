@@ -336,7 +336,7 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
 
   Future<void> _reset() async {
     await CookieManager.instance().deleteAllCookies();
-    await WebStorageManager.instance().deleteAllData();
+    await InAppWebViewController.clearAllCache();
     await _webViewController?.clearCache();
     if (!mounted) return;
     Navigator.of(context).pop();
@@ -348,7 +348,7 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Nexus Link', style: TextStyle(fontWeight: FontWeight.w700)),
-        backgroundColor: NexusColors.navy.withOpacity(0.92),
+        backgroundColor: NexusColors.navy.withValues(alpha: 0.92),
         actions: [
           IconButton(
             tooltip: 'Clear all sessions',
@@ -424,11 +424,11 @@ class _BrandHeader extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: NexusColors.teal.withOpacity(0.13),
+            color: NexusColors.teal.withValues(alpha: 0.13),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: NexusColors.teal.withOpacity(0.5)),
+            border: Border.all(color: NexusColors.teal.withValues(alpha: 0.5)),
             boxShadow: [
-              BoxShadow(color: NexusColors.teal.withOpacity(0.2), blurRadius: 18),
+              BoxShadow(color: NexusColors.teal.withValues(alpha: 0.2), blurRadius: 18),
             ],
           ),
           child: const Icon(Icons.hub_rounded, color: NexusColors.teal, size: 25),
@@ -461,7 +461,7 @@ class _GlassPanel extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.055),
+            color: Colors.white.withValues(alpha: 0.055),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: NexusColors.border),
           ),
@@ -485,7 +485,7 @@ class _GlowButton extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
-          BoxShadow(color: NexusColors.teal.withOpacity(0.28), blurRadius: 22, spreadRadius: 1),
+          BoxShadow(color: NexusColors.teal.withValues(alpha: 0.28), blurRadius: 22, spreadRadius: 1),
         ],
       ),
       child: FilledButton.icon(
@@ -521,7 +521,7 @@ class _AmbientGlow extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
-                colors: [NexusColors.teal.withOpacity(0.1), Colors.transparent],
+                colors: [NexusColors.teal.withValues(alpha: 0.1), Colors.transparent],
               ),
             ),
           ),
