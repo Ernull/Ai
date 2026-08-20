@@ -1,0 +1,66 @@
+name: Build Nexus Link APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Clean and Rebuild Android Platform
+        run: |
+          # ۱. حذف کامل فایل‌های اندرویدی قدیمی برای جلوگیری از تداخل با برنامه قبلی
+          rm -rf android
+          
+          # ۲. ساخت مجدد پلتفرم اندروید با نام و آیدی کاملاً جدید
+          flutter create --platforms=android --project-name nexus_link --org com.hyperlink.nexus .
+          
+          # ۳. ارتقای حداقل نسخه اندروید به 24 (پیش‌نیاز ضروری InAppWebView)
+          sed -i 's/flutter.minSdkVersion/24/g' android/app/build.gradle*
+          sed -i 's/minSdkVersion 16/minSdkVersion 24/g' android/app/build.gradle*
+          sed -i 's/minSdkVersion 19/minSdkVersion 24/g' android/app/build.gradle*
+          sed -i 's/minSdkVersion 21/minSdkVersion 24/g' android/app/build.gradle*
+          
+          # ۴. افزودن دسترسی اینترنت به مانیفست اندروید
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
+          
+          # ۵. تغییر نام نمایشی برنامه در گوشی به Nexus Link
+          sed -i 's/android:label="nexus_link"/android:label="Nexus Link"/' android/app/src/main/AndroidManifest.xml
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Generate App Icon
+        run: dart run flutter_launcher_icons
+
+      - name: Patch InAppWebView Gradle Compatibility
+        run: |
+          # ۶. اصلاح خطای ناسازگاری پروگارد در کشِ کتابخانه InAppWebView
+          find ~/.pub-cache/hosted/pub.dev/flutter_inappwebview_android-*/android -name build.gradle -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
+
+      - name: Build Optimized APK
+        # ۷. خروجی گرفتن و تقسیم بر اساس پردازنده برای کاهش حجم
+        run: flutter build apk --release --split-per-abi
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-link-app-optimized
+          path: build/app/outputs/flutter-apk/*-release.apk
