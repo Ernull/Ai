@@ -92,7 +92,7 @@ class NexusLinkApp extends StatelessWidget {
 
 class LinkExtractorService {
   static final RegExp _urlPattern = RegExp(
-    r'(?:https?://)?okalav2\.up\.railway\.app[^\s\"\'\<\>\)\]\}]*',
+    r'(?:https?://)?okalav2\.up\.railway\.app[^\s"\'<>\)\]\}]*',
     caseSensitive: false,
     multiLine: true,
   );
